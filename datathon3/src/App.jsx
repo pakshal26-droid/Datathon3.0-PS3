@@ -18,7 +18,7 @@ const TicketForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/tickets`, formData);
+      await axios.post(`http://127.0.0.1:8000/classify-ticket`, formData);
       setMessage('Ticket submitted successfully!');
       setFormData({ name: '', description: '', user_email: '' });
     } catch (error) {

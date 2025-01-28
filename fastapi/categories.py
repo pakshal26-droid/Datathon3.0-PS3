@@ -5,6 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables
 load_dotenv(override=True)
@@ -14,6 +15,13 @@ os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 # Initialize FastAPI app
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Allow your frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Initialize LangChain LLM
 llm = ChatOpenAI(model="gpt-3.5-turbo")
@@ -36,10 +44,12 @@ urgency_prompt = ChatPromptTemplate.from_messages(
 
 # Define request and response schemas
 class TicketRequest(BaseModel):
-    ticket: str
+    name: str
+    description: str
+    user_email: str
 
 class TicketResponse(BaseModel):
-    ticket: str
+    description: str
     category: str
     urgency: str
 
@@ -48,7 +58,7 @@ class TicketResponse(BaseModel):
 async def classify_ticket(request: TicketRequest):
     try:
         # Get ticket text from the request
-        ticket_text = request.ticket
+        ticket_text = request.description
 
         # Classify ticket type
         ticket_type_chain = ticket_type_prompt | llm | output_parser
@@ -60,7 +70,7 @@ async def classify_ticket(request: TicketRequest):
 
         # Return classification
         return TicketResponse(
-            ticket=ticket_text,
+            description=ticket_text,
             category=category,
             urgency=urgency
         )
