@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List,Optional, Union
+from datetime import datetime  # Fix import statement
 
 # Load environment variables
 load_dotenv(override=True)
@@ -85,7 +86,7 @@ urgency_prompt = ChatPromptTemplate.from_messages(
 
 response_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system",'''**Role**: Act as a Level 1 Support Agent for Motivity Labs. Your task is to:  
+        ("system", '''**Role**: Act as a Level 1 Support Agent for Motivity Labs. Your task is to:  
                     1. **Resolve** user issues falling under Level 1 categories (listed below).  
                     2. **Escalate** to Level 2 if the issue is complex or outside Level 1 scope.  
 
@@ -96,17 +97,17 @@ response_prompt = ChatPromptTemplate.from_messages(
                     - **Installation**: Standard software setup, prerequisite verification.  
                     - **Cloud/Data**: Cloud service access (AWS/Azure/GCP), dashboard configuration.  
                     - **Compatibility**: Confirming system specs meet requirements.  
-                    - **General FAQs**: Answers about Motivity Labs’ services, basic escalations.  
+                    - **General FAQs**: Answers about Motivity Labs services, basic escalations.  
 
                     **Instructions**:  
                     1. **If the query is resolvable under Level 1**:  
                         - Provide a **step-by-step solution** in simple, non-technical language.  
                         - Include troubleshooting tips (e.g., cache clearing, restarting apps).  
                         - Use numbered lists for clarity.  
-                        - End with a friendly reassurance (e.g., "Let us know if you need more help!").  
+                        - End with a friendly reassurance (e.g., Let us know if you need more help!).  
 
                     2. **If the query is outside Level 1 scope**:  
-                        - Respond: "This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you within sometime."  
+                        - Respond: This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you within sometime.  
                         - Do not speculate or provide incomplete fixes.  
 
                     **Rules**:  
@@ -116,20 +117,19 @@ response_prompt = ChatPromptTemplate.from_messages(
 
                     **Examples**:  
 
-                    **Query**: "I forgot my password and cant log in."  
+                    **Query**: I forgot my password and cant log in.
                     **Response**:  
                     1. Go to [Motivity Labs Login Page].  
-                    2. Click "Forgot Password."  
+                    2. Click Forgot Password.
                     3. Enter your registered email.  
                     4. Check your inbox for a reset link.  
                     5. Create a new password.  
                     Let us know if you need further assistance!  
 
-                    **Query**: "The app keeps crashing when I open reports."  
+                    **Query**: The app keeps crashing when I open reports. 
                     **Response**:  
-                    This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you within some time.   
-                    ''')
-        ("user","Ticket:{ticket}")
+                    This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you within some time. '''),
+        ("user","Ticket: {ticket}")
     ]
 )
 
@@ -177,7 +177,7 @@ chatbot_prompt = ChatPromptTemplate.from_messages(
                     **User**: *"There's a critical bug in your API integration."*  
                     **Response**:  
                     *"I'm so sorry about this! Our engineering team needs to investigate. Could you submit a ticket [here]? They'll prioritize this and update you within 1 hour. Thank you for your patience! 🙏"*  
-                                    ''')
+                                    '''),
         ("user","Question : {question}")
     ]
 )
@@ -211,6 +211,8 @@ class Ticket(BaseModel):
     urgency: str
     status: str
     response: str
+
+
 
 # In-memory storage for demo purposes
 tickets_db = []
@@ -252,6 +254,7 @@ async def create_ticket(request: TicketRequest):
             user_email=request.user_email,
             category=category,
             urgency=urgency,
+            created_at=datetime.now(),  # Use datetime.now() correctly
             status="Open",
             response=ticket_response
         )
@@ -297,3 +300,5 @@ async def get_chat_history(user_id: str):
     if user_id not in chat_history:
         return []
     return chat_history[user_id]
+
+
