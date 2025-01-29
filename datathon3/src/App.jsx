@@ -1,6 +1,6 @@
 // App.jsx
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import ChatInterface from './components/ChatInterface';
 import Dashboard from './components/Dashboard';
@@ -14,16 +14,20 @@ const TicketForm = () => {
     user_email: ''
   });
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await axios.post(`http://127.0.0.1:8000/tickets/`, formData);
       setMessage('Ticket submitted successfully!');
       setFormData({ name: '', description: '', user_email: '' });
     } catch (error) {
       setMessage('Error submitting ticket');
-      console.log(error.message)
+      console.log(error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -75,9 +79,14 @@ const TicketForm = () => {
           
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-white hover:text-black w-full text-white font-semibold text-md px-4 py-3 border-black  border-2 rounded-full hover:bg-blue-600"
+            disabled={isSubmitting}
+            className={`w-full text-white font-semibold text-md px-4 py-3 border-black border-2 rounded-full transition-all duration-200 ${
+              isSubmitting 
+                ? 'bg-gray-400 cursor-not-allowed opacity-70' 
+                : 'bg-blue-600 hover:bg-white hover:text-black hover:bg-blue-600'
+            }`}
           >
-            Submit Ticket
+            {isSubmitting ? 'Submitting...' : 'Submit Ticket'}
           </button>
         </form>
       </div>
@@ -86,6 +95,15 @@ const TicketForm = () => {
   );
 };
 
+// Ticket Form Component with Chat Interface
+const TicketFormWithChat = () => {
+  return (
+    <>
+      <TicketForm />
+      <ChatInterface />
+    </>
+  );
+};
 
 // Main App Component
 const App = () => {
@@ -93,7 +111,7 @@ const App = () => {
     <Router>
       <div className="min-h-screen bg-gray-100 font-Anek tracking-tight ">
         <nav className="bg-white shadow mb-8">
-          <div className="max-w-7xl mx-auto px-4">
+          <div className=" mx-auto px-4">
             <div className="flex justify-between h-16">
               <div className="flex items-center justify-between w-full">
                 <h1 className='text-2xl font-semibold'>SeepDeek</h1>
@@ -115,15 +133,12 @@ const App = () => {
         </nav>
 
         <Routes>
-          <Route path="/" element={<TicketForm />} />
+          <Route path="/" element={<TicketFormWithChat />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/faq" element={<FAQ />} />
         </Routes>
-        <ChatInterface />
       </div>
-      
     </Router>
-    
   );
 };
 
