@@ -6,9 +6,10 @@ from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List,Optional, Union , Any
-from datetime import datetime  # Fix import statement
-from enum import Enum
+from typing import List,Optional, Union , Dict
+from datetime import datetime, timedelta  # Fix import statement
+from collections import defaultdict
+
 
 # Load environment variables
 load_dotenv(override=True)
@@ -34,21 +35,25 @@ output_parser = StrOutputParser()
 ticket_type_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", ''' Classify the user's support query into **exactly one** of these Level 1 ticket categories:  
-                        1. **Account & Security** (e.g., password resets, login failures, MFA issues, account security, compliance)  
-                        2. **Product Support** (e.g., navigation help, feature guidance, FAQs, dashboard/report access, visualization errors)  
-                        3. **Technical Setup** (e.g., software/hardware checks, compatibility, installation, configuration, QA tool issues)  
-                        4. **Cloud Services** (e.g., mobile app issues, cloud access, AWS/Azure/GCP errors)  
-                        5. **General** (e.g., service info, non-technical inquiries, unclassifiable issues)  
+                        1. **Access** (e.g., password resets, login failures, MFA issues)  
+                        2. **Usage** (e.g., navigation help, feature guidance, FAQs)  
+                        3. **Verification** (e.g., hardware/software checks, compatibility)  
+                        4. **Installation** (e.g., setup, configuration, troubleshooting)  
+                        5. **Cloud** (e.g., mobile app issues, cloud service access)  
+                        6. **Analytics** (e.g., report/dashboard access, visualization errors)  
+                        7. **QA** (e.g., QA tool issues, test execution problems)  
+                        8. **Security** (e.g., account security, compliance procedures)  
+                        9. **General** (e.g., service info, non-technical inquiries)  
 
                         **Rules:**  
-                        - Return **only the category name** (e.g., "Account & Security").  
-                        - Prioritize specificity (e.g., "I can’t access AWS" → **Cloud Services**, not "General").  
+                        - Return **only the category name** (e.g., "Access").  
+                        - Prioritize specificity (e.g., a login failure is "Access," not "General").  
                         - Default to "General" if unsure.  
 
                         **Example Query:**  
                         "I can't log in to the app despite resetting my password."  
                         **Response:**  
-                        Account & Security    '''),
+                        Access  '''),
         ("user", "Ticket: {ticket}")
     ]
 )
@@ -88,42 +93,44 @@ response_prompt = ChatPromptTemplate.from_messages(
                     2. **Escalate** to Level 2 if the issue is complex or outside Level 1 scope.  
 
                     **Level 1 Scope**:  
-                    - **Account & Security**: Password resets, login troubleshooting, account unlocks, MFA issues.  
-                    - **Product Support**: Feature explanations, dashboard navigation, FAQs, analytics/report access.  
-                    - **Technical Setup**: App/software installation, compatibility checks, basic troubleshooting (crashes, slow performance).  
-                    - **Cloud Services**: Cloud access (AWS/Azure/GCP), mobile app issues, dashboard configuration.  
-                    - **General**: Non-technical inquiries, service information, issue escalation.  
+                    - **Authentication & Access**: Password resets, login troubleshooting, account unlocks.  
+                    - **Basic Troubleshooting**: App crashes, slow performance, initial setup guidance.  
+                    - **Product Guidance**: Feature explanations, dashboard navigation, analytics tool help.  
+                    - **Installation**: Standard software setup, prerequisite verification.  
+                    - **Cloud/Data**: Cloud service access (AWS/Azure/GCP), dashboard configuration.  
+                    - **Compatibility**: Confirming system specs meet requirements.  
+                    - **General FAQs**: Answers about Motivity Labs services, basic escalations.  
 
                     **Instructions**:  
-                    1. **If resolvable under Level 1**:  
+                    1. **If the query is resolvable under Level 1**:  
                         - Provide a **step-by-step solution** in simple, non-technical language.  
-                        - Include troubleshooting tips (e.g., "Clear cache," "Restart the app").  
+                        - Include troubleshooting tips (e.g., cache clearing, restarting apps).  
                         - Use numbered lists for clarity.  
-                        - End with reassurance: "Let us know if you need more help!"  
+                        - End with a friendly reassurance (e.g., Let us know if you need more help!).  
 
-                    2. **If outside Level 1 scope**:  
-                        - Respond: "This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you shortly."  
-                        - Do **not** speculate or provide incomplete fixes.  
+                    2. **If the query is outside Level 1 scope**:  
+                        - Respond: This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you within sometime.  
+                        - Do not speculate or provide incomplete fixes.  
 
                     **Rules**:  
                     - Prioritize brevity and empathy.  
-                    - Avoid jargon; use everyday language.  
-                    - Never invent solutions for unverifiable issues (e.g., server outages, API errors).  
+                    - Avoid jargon; use layman-friendly terms.  
+                    - Never invent solutions for unverifiable issues (e.g., server outages, custom code errors).  
 
                     **Examples**:  
 
-                    **Query**: "I forgot my password and can't log in."  
+                    **Query**: I forgot my password and cant log in.
                     **Response**:  
                     1. Go to [Motivity Labs Login Page].  
-                    2. Click "Forgot Password."  
+                    2. Click Forgot Password.
                     3. Enter your registered email.  
-                    4. Check your inbox for the reset link.  
+                    4. Check your inbox for a reset link.  
                     5. Create a new password.  
                     Let us know if you need further assistance!  
 
-                    **Query**: "The app crashes when exporting data."  
+                    **Query**: The app keeps crashing when I open reports. 
                     **Response**:  
-                    This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you shortly.   '''),
+                    This requires further investigation. Your ticket has been assigned to a specialist, and they will contact you within some time. '''),
         ("user","Ticket: {ticket}")
     ]
 )
@@ -146,12 +153,12 @@ chatbot_prompt = ChatPromptTemplate.from_messages(
                     - Acknowledge frustration: *"That sounds stressful! Here's how to resolve this…"*  
 
                     2. **Resolve Level 1 Issues**:  
-                    - Provide **simple, numbered steps** (e.g., *"1. Go to the login page > 2. Click 'Reset Password'"*).  
+                    - Provide **simple, numbered steps** (e.g., *"1. Go to [link] > 2. Click 'Reset Password'"*).  
                     - Use plain language (no jargon).  
                     - End with reassurance: *"Let me know if this helps! 😊"*  
 
                     3. **Escalate Complex Queries**:  
-                    - Say: *"This needs special attention! Please submit a ticket in the support section. Our team will reach out in some time to resolve this!"*  
+                    - Say: *"This needs special attention! Please submit a ticket [here]. Our team will reach out within [X hours] to resolve this!"*  
                     - Never leave users without a next step.  
 
                     **Rules**:  
@@ -197,122 +204,52 @@ class ChatResponse(BaseModel):
     response: str
     suggested_actions: Optional[List[str]] = None
 
-class TicketCategory(str, Enum):
-    ACCOUNT_SECURITY = "Account and Security"
-    PRODUCT_SUPPORT = "Product Support"
-    TECHNICAL_SUPPORT = "Technical Support"
-    CLOUD_SERVICES = "Cloud Services"
-    GENERAL = "General"
- 
-class TicketUrgency(str, Enum):
-    CRITICAL = "Critical"
-    HIGH = "High"
-    MEDIUM = "Medium"
-    LOW = "Low"
-
-class TicketStatus(str, Enum):
-    OPEN = "Open"
-    RESOLVED = "Resolved"
-
 class Ticket(BaseModel):
     id: int
     name: str
     description: str
     user_email: str
-    category: TicketCategory
-    urgency: TicketUrgency
-    status: TicketStatus
+    category: str
+    urgency: str
+    status: str
     response: str
-    created_at: datetime
-    resolved_at: Optional[datetime] = None
-    assigned_to: Optional[str] = None
-    resolution_notes: Optional[str] = None
+    created_at: datetime  # Add this line
 
-    class Config:
-        use_enum_values = True
+class AnalyticsResponse(BaseModel):
+    total_tickets: int
+    open_tickets: int
+    avg_resolution_time: float
+    tickets_by_category: Dict[str, int]
+    tickets_by_status: Dict[str, int]
+    response_times: List[dict]
 
-TICKET_METADATA = {
-    "categories": [
-        {
-            "id": "Account and Security",
-            "label": "Account and Security",
-            "description": "Password resets, account access, security concerns, authentication issues"
-        },
-        {
-            "id": "Product Support",
-            "label": "Product Support",
-            "description": "Product usage, features, functionality, user guides"
-        },
-        {
-            "id": "Technical Support",
-            "label": "Technical Support",
-            "description": "Technical issues, bugs, system errors, installation problems"
-        },
-        {
-            "id": "Cloud Services",
-            "label": "Cloud Services",
-            "description": "Cloud infrastructure, deployments, cloud-related issues"
-        },
-        {
-            "id": "General",
-            "label": "General",
-            "description": "General inquiries, feedback, non-technical questions"
-        }
-    ],
-    "urgency_levels": [
-        {"id": "Critical", "label": "Critical", "description": "Total system outage, data breach"},
-        {"id": "High", "label": "High", "description": "Critical feature broken, security vulnerability"},
-        {"id": "Medium", "label": "Medium", "description": "Partial feature disruption with workaround"},
-        {"id": "Low", "label": "Low", "description": "Cosmetic bugs, non-urgent requests"}
-    ],
-    "status_types": [
-        {"id": "Open", "label": "Open", "description": "Ticket awaiting initial response"},
-        {"id": "Resolved", "label": "Resolved", "description": "Issue has been resolved"}
-    ]
-}
+class TicketUpdate(BaseModel):
+    status: str
+
+
 
 # In-memory storage for demo purposes
 tickets_db = []
 chat_history = {}
-
-@app.get("/api/metadata")
-async def get_metadata():
-    """Get all ticket categories, urgency levels, and status types"""
-    return TICKET_METADATA
-
-@app.post("/tickets/", response_model=Ticket)
-async def create_ticket(request: TicketRequest):
-    """Create a new support ticket"""
+@app.put("/tickets/{ticket_id}", response_model=Ticket)
+async def update_ticket(ticket_id: int, update_data: TicketUpdate):
+    """Update a ticket's status"""
     try:
-        # Classify ticket type and urgency using LLM
-        ticket_type_chain = ticket_type_prompt | llm | output_parser
-        category_str = ticket_type_chain.invoke({"ticket": request.description}).strip()
+        # Find the ticket
+        ticket = next((t for t in tickets_db if t.id == ticket_id), None)
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
         
-        urgency_chain = urgency_prompt | llm | output_parser
-        urgency_str = urgency_chain.invoke({"ticket": request.description}).strip()
-        
-        response_chain = response_prompt | llm | output_parser
-        ticket_response = response_chain.invoke({"ticket": request.description}).strip()
-
-        # Create ticket with proper enum values
-        ticket = Ticket(
-            id=len(tickets_db) + 1,
-            name=request.name,
-            description=request.description,
-            user_email=request.user_email,
-            category=TicketCategory(category_str),  # Convert string to enum
-            urgency=TicketUrgency(urgency_str),    # Convert string to enum
-            status=TicketStatus.OPEN,           # Use enum directly
-            response=ticket_response,
-            created_at=datetime.now()
-        )
-        
-        tickets_db.append(ticket)
+        # Update the status
+        ticket.status = update_data.status
         return ticket
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid category or urgency value: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tickets/", response_model=List[Ticket])
+async def get_tickets():
+    """Get all tickets"""
+    return tickets_db
 
 @app.get("/tickets/{ticket_id}", response_model=Ticket)
 async def get_ticket(ticket_id: int):
@@ -321,6 +258,39 @@ async def get_ticket(ticket_id: int):
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return ticket
+
+@app.post("/tickets/", response_model=Ticket)
+async def create_ticket(request: TicketRequest):
+    """Create a new support ticket"""
+    try:
+        # Classify ticket type and urgency
+        ticket_type_chain = ticket_type_prompt | llm | output_parser
+        category = ticket_type_chain.invoke({"ticket": request.description}).strip()
+
+        urgency_chain = urgency_prompt | llm | output_parser
+        urgency = urgency_chain.invoke({"ticket": request.description}).strip()
+
+        # Generate response
+        response_chain = response_prompt | llm | output_parser
+        ticket_response = response_chain.invoke({"ticket": request.description}).strip()
+
+        # Create ticket object
+        ticket = Ticket(
+            id=len(tickets_db) + 1,
+            name=request.name,
+            description=request.description,
+            user_email=request.user_email,
+            category=category,
+            urgency=urgency,
+            created_at=datetime.now(),  # Use datetime.now() correctly
+            status="Open",
+            response=ticket_response
+        )
+        
+        tickets_db.append(ticket)
+        return ticket
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
@@ -359,44 +329,104 @@ async def get_chat_history(user_id: str):
         return []
     return chat_history[user_id]
 
-@app.get("/api/analytics")
+@app.get("/analytics/", response_model=AnalyticsResponse)
 async def get_analytics():
-    if not tickets_db:
-        return {
-            "total_tickets": 0,
-            "status_distribution": {status.value: 0 for status in TicketStatus},
-            "category_distribution": {category.value: 0 for category in TicketCategory},
-            "urgency_distribution": {urgency.value: 0 for urgency in TicketUrgency},
-        }
+    """Get analytics data for the dashboard"""
+    try:
+        # Calculate total tickets
+        total_tickets = len(tickets_db)
+        
+        # Count open tickets
+        open_tickets = sum(1 for ticket in tickets_db if ticket.status == "Open")
+        
+        # Calculate average resolution time
+        resolution_times = []
+        for ticket in tickets_db:
+            if ticket.status == "Resolved":
+                created = ticket.created_at
+                # Simulate resolution time for demo purposes
+                # In real app, you'd use actual resolution timestamp
+                resolution_time = created + timedelta(hours=float(ticket.id))
+                time_diff = (resolution_time - created).total_seconds() / 3600  # Convert to hours
+                resolution_times.append(time_diff)
+        
+        avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
+        
+        # Count tickets by category and status
+        tickets_by_category = defaultdict(int)
+        tickets_by_status = defaultdict(int)
+        
+        for ticket in tickets_db:
+            tickets_by_category[ticket.category] += 1
+            tickets_by_status[ticket.status] += 1
+        
+        # Get response times data for chart
+        response_times = [
+            {
+                "date": (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d"),
+                "time": round(float(i + 1) * 1.5, 1)  # Simulated data
+            }
+            for i in range(7)
+        ]
+        
+        return AnalyticsResponse(
+            total_tickets=total_tickets,
+            open_tickets=open_tickets,
+            avg_resolution_time=avg_resolution_time,
+            tickets_by_category=dict(tickets_by_category),
+            tickets_by_status=dict(tickets_by_status),
+            response_times=response_times
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    total_tickets = len(tickets_db)
-    solved_tickets = len([t for t in tickets_db if t.status == TicketStatus.RESOLVED])
+# @app.get("/tickets/filtered/")
+# async def get_filtered_tickets(
+#     status: Optional[str] = None,
+#     category: Optional[str] = None,
+#     from_date: Optional[str] = None,
+#     to_date: Optional[str] = None
+# ):
+#     """Get filtered tickets based on criteria"""
+#     filtered_tickets = tickets_db.copy()
     
-    # Initialize distributions with zeros
-    status_distribution = {"Open": 0, "Resolved": 0}
-    category_distribution = {category.value: 0 for category in TicketCategory}
-    urgency_distribution = {urgency.value: 0 for urgency in TicketUrgency}
+#     if status:
+#         filtered_tickets = [t for t in filtered_tickets if t.status == status]
     
-    open_tickets = 0
-    resolved_tickets = 0
-
-    for ticket in tickets_db:
-        # Convert status to "Open" or "Resolved"
-        if ticket.status == TicketStatus.OPEN:
-            status_distribution["Open"] += 1
-            open_tickets += 1
-        elif ticket.status == TicketStatus.RESOLVED:
-            status_distribution["Resolved"] += 1
-            resolved_tickets += 1
-
-        category_distribution[ticket.category.value] += 1
-        urgency_distribution[ticket.urgency.value] += 1
-
-    return {
-        "total_tickets": total_tickets,
-        "open_tickets": open_tickets,
-        "resolved_tickets": resolved_tickets,
-        "status_distribution": status_distribution,
-        "category_distribution": category_distribution,
-        "urgency_distribution": urgency_distribution,
-    }
+#     if category:
+#         filtered_tickets = [t for t in filtered_tickets if t.category == category]
+    
+#     if from_date:
+#         from_datetime = datetime.fromisoformat(from_date)
+#         filtered_tickets = [t for t in filtered_tickets if t.created_at >= from_datetime]
+    
+#     if to_date:
+#         to_datetime = datetime.fromisoformat(to_date)
+#         filtered_tickets = [t for t in filtered_tickets if t.created_at <= to_datetime]
+    
+#     return filtered_tickets
+@app.get("/tickets/filtered/", response_model=List[Ticket])
+async def get_filtered_tickets(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None
+):
+    """Get filtered tickets based on criteria"""
+    filtered_tickets = tickets_db
+    
+    if status:
+        filtered_tickets = [t for t in filtered_tickets if t.status.lower() == status.lower()]
+    
+    if category:
+        filtered_tickets = [t for t in filtered_tickets if t.category.lower() == category.lower()]
+    
+    if from_date:
+        from_datetime = datetime.fromisoformat(from_date)
+        filtered_tickets = [t for t in filtered_tickets if t.created_at >= from_datetime]
+    
+    if to_date:
+        to_datetime = datetime.fromisoformat(to_date)
+        filtered_tickets = [t for t in filtered_tickets if t.created_at <= to_datetime]
+    
+    return filtered_tickets
