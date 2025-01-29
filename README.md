@@ -1,7 +1,7 @@
 # 🚀 AI-Driven IT Support Automation  
 **Reducing Resolution Times by 50% with LLMs and Proactive Analytics**  
 
-![Demo GIF](./public/demo.gif) *Replace with a short demo GIF showing key features*
+
 
 ---
 
