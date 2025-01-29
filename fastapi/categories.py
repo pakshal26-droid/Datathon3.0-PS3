@@ -373,24 +373,30 @@ async def get_analytics():
     solved_tickets = len([t for t in tickets_db if t.status == TicketStatus.RESOLVED])
     
     # Initialize distributions with zeros
-    status_distribution = {status.value: 0 for status in TicketStatus}
+    status_distribution = {"Open": 0, "Resolved": 0}
     category_distribution = {category.value: 0 for category in TicketCategory}
     urgency_distribution = {urgency.value: 0 for urgency in TicketUrgency}
     
-    # Count actual distributions
+    open_tickets = 0
+    resolved_tickets = 0
+
     for ticket in tickets_db:
-        status_distribution[ticket.status] += 1
-        category_distribution[ticket.category] += 1
-        urgency_distribution[ticket.urgency] += 1
-    
-    
+        # Convert status to "Open" or "Resolved"
+        if ticket.status == TicketStatus.OPEN:
+            status_distribution["Open"] += 1
+            open_tickets += 1
+        elif ticket.status == TicketStatus.RESOLVED:
+            status_distribution["Resolved"] += 1
+            resolved_tickets += 1
+
+        category_distribution[ticket.category.value] += 1
+        urgency_distribution[ticket.urgency.value] += 1
+
     return {
         "total_tickets": total_tickets,
+        "open_tickets": open_tickets,
+        "resolved_tickets": resolved_tickets,
         "status_distribution": status_distribution,
         "category_distribution": category_distribution,
         "urgency_distribution": urgency_distribution,
-        "tickets_by_category": {
-            category.value: len([t for t in tickets_db if t.category == category.value])
-            for category in TicketCategory
-        }
     }
