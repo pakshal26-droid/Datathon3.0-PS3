@@ -8,6 +8,7 @@ const ChatInterface = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isMinimized, setIsMinimized] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const messagesEndRef = useRef(null);
   const userId = useRef('user-' + Math.random().toString(36).substr(2, 9));
 const navigate = useNavigate();
@@ -82,10 +83,10 @@ const navigate = useNavigate();
 
   if (isMinimized) {
     return (
-      <div className="fixed bottom-4 right-4 bg-white rounded-full shadow-xl border border-gray-200 p-4 cursor-pointer"
+      <div className="fixed bottom-6 right-6 bg-white rounded-full shadow-xl border border-gray-200 p-4 cursor-pointer"
            onClick={() => setIsMinimized(false)}>
         <div className="relative">
-          <MessageCircle size={24} className="text-blue-500" />
+          <MessageCircle size={36} className="text-blue-500" />
           {messages.length > 0 && (
             <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
               {messages.length}
@@ -97,26 +98,34 @@ const navigate = useNavigate();
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col h-[600px]">
+    <div className={`fixed bottom-4 right-4 w-96 rounded-lg shadow-xl border flex flex-col h-[600px] ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
       {/* Chat Header */}
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Support Chat</h3>
-        <button 
-          onClick={() => setIsMinimized(true)}
-          className="p-1 hover:bg-gray-100 rounded-full"
-        >
-          <Minimize2 size={20} />
-        </button>
+      <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-black'}`}>Support Chat</h3>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setDarkMode(!darkMode)}
+            className="p-1 hover:bg-gray-100 rounded-full"
+          >
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          <button 
+            onClick={() => setIsMinimized(true)}
+            className="p-1 hover:bg-gray-100 rounded-full"
+          >
+            <Minimize2 size={20} className={darkMode ? 'text-white' : 'text-black'} />
+          </button>
+        </div>
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] p-3 rounded-lg ${
               message.type === 'user' 
-                ? 'bg-blue-500 text-white rounded-br-none' 
-                : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                ? `${darkMode ? 'bg-blue-700 text-white' : 'bg-blue-500 text-white'} rounded-br-none` 
+                : `${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded-bl-none`
             }`}>
               <p>{message.content}</p>
               {message.actions && message.actions.length > 0 && (
@@ -124,7 +133,7 @@ const navigate = useNavigate();
                   {message.actions.map((action, idx) => (
                     <button
                       key={idx}
-                      className="block w-full text-sm text-left px-2 py-1 hover:bg-gray-200 rounded"
+                      className={`block w-full text-sm text-left px-2 py-1 rounded ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'}`}
                       onClick={() => handleActionClick(action)}
                     >
                       {action}
@@ -137,7 +146,7 @@ const navigate = useNavigate();
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 p-3 rounded-lg rounded-bl-none">
+            <div className={`p-3 rounded-lg rounded-bl-none ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'}`}>
               Typing...
             </div>
           </div>
@@ -146,20 +155,20 @@ const navigate = useNavigate();
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
+      <form onSubmit={handleSubmit} className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 p-2 border rounded-lg focus:outline-none focus:border-blue-500"
+            className={`flex-1 p-2 border rounded-lg focus:outline-none ${darkMode ? 'bg-gray-700 text-white border-gray-600 focus:border-blue-500' : 'bg-white text-black border-gray-300 focus:border-blue-500'}`}
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300"
+            className={`px-4 py-2 font-semibold border-1 rounded-lg ${darkMode ? 'bg-blue-700 text-white border-black hover:bg-blue-600 disabled:bg-blue-300' : 'bg-blue-700 text-white border-black hover:bg-blue-600 disabled:bg-blue-300'}`}
           >
             Send
           </button>

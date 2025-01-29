@@ -6,8 +6,10 @@ from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List,Optional, Union
-from datetime import datetime  # Fix import statement
+from typing import List,Optional, Union , Dict
+from datetime import datetime, timedelta  # Fix import statement
+from collections import defaultdict
+
 
 # Load environment variables
 load_dotenv(override=True)
@@ -211,12 +213,38 @@ class Ticket(BaseModel):
     urgency: str
     status: str
     response: str
+    created_at: datetime  # Add this line
+
+class AnalyticsResponse(BaseModel):
+    total_tickets: int
+    open_tickets: int
+    avg_resolution_time: float
+    tickets_by_category: Dict[str, int]
+    tickets_by_status: Dict[str, int]
+    response_times: List[dict]
+
+class TicketUpdate(BaseModel):
+    status: str
 
 
 
 # In-memory storage for demo purposes
 tickets_db = []
 chat_history = {}
+@app.put("/tickets/{ticket_id}", response_model=Ticket)
+async def update_ticket(ticket_id: int, update_data: TicketUpdate):
+    """Update a ticket's status"""
+    try:
+        # Find the ticket
+        ticket = next((t for t in tickets_db if t.id == ticket_id), None)
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        # Update the status
+        ticket.status = update_data.status
+        return ticket
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/tickets/", response_model=List[Ticket])
 async def get_tickets():
@@ -301,4 +329,104 @@ async def get_chat_history(user_id: str):
         return []
     return chat_history[user_id]
 
+@app.get("/analytics/", response_model=AnalyticsResponse)
+async def get_analytics():
+    """Get analytics data for the dashboard"""
+    try:
+        # Calculate total tickets
+        total_tickets = len(tickets_db)
+        
+        # Count open tickets
+        open_tickets = sum(1 for ticket in tickets_db if ticket.status == "Open")
+        
+        # Calculate average resolution time
+        resolution_times = []
+        for ticket in tickets_db:
+            if ticket.status == "Resolved":
+                created = ticket.created_at
+                # Simulate resolution time for demo purposes
+                # In real app, you'd use actual resolution timestamp
+                resolution_time = created + timedelta(hours=float(ticket.id))
+                time_diff = (resolution_time - created).total_seconds() / 3600  # Convert to hours
+                resolution_times.append(time_diff)
+        
+        avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
+        
+        # Count tickets by category and status
+        tickets_by_category = defaultdict(int)
+        tickets_by_status = defaultdict(int)
+        
+        for ticket in tickets_db:
+            tickets_by_category[ticket.category] += 1
+            tickets_by_status[ticket.status] += 1
+        
+        # Get response times data for chart
+        response_times = [
+            {
+                "date": (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d"),
+                "time": round(float(i + 1) * 1.5, 1)  # Simulated data
+            }
+            for i in range(7)
+        ]
+        
+        return AnalyticsResponse(
+            total_tickets=total_tickets,
+            open_tickets=open_tickets,
+            avg_resolution_time=avg_resolution_time,
+            tickets_by_category=dict(tickets_by_category),
+            tickets_by_status=dict(tickets_by_status),
+            response_times=response_times
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+# @app.get("/tickets/filtered/")
+# async def get_filtered_tickets(
+#     status: Optional[str] = None,
+#     category: Optional[str] = None,
+#     from_date: Optional[str] = None,
+#     to_date: Optional[str] = None
+# ):
+#     """Get filtered tickets based on criteria"""
+#     filtered_tickets = tickets_db.copy()
+    
+#     if status:
+#         filtered_tickets = [t for t in filtered_tickets if t.status == status]
+    
+#     if category:
+#         filtered_tickets = [t for t in filtered_tickets if t.category == category]
+    
+#     if from_date:
+#         from_datetime = datetime.fromisoformat(from_date)
+#         filtered_tickets = [t for t in filtered_tickets if t.created_at >= from_datetime]
+    
+#     if to_date:
+#         to_datetime = datetime.fromisoformat(to_date)
+#         filtered_tickets = [t for t in filtered_tickets if t.created_at <= to_datetime]
+    
+#     return filtered_tickets
+@app.get("/tickets/filtered/", response_model=List[Ticket])
+async def get_filtered_tickets(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None
+):
+    """Get filtered tickets based on criteria"""
+    filtered_tickets = tickets_db
+    
+    if status:
+        filtered_tickets = [t for t in filtered_tickets if t.status.lower() == status.lower()]
+    
+    if category:
+        filtered_tickets = [t for t in filtered_tickets if t.category.lower() == category.lower()]
+    
+    if from_date:
+        from_datetime = datetime.fromisoformat(from_date)
+        filtered_tickets = [t for t in filtered_tickets if t.created_at >= from_datetime]
+    
+    if to_date:
+        to_datetime = datetime.fromisoformat(to_date)
+        filtered_tickets = [t for t in filtered_tickets if t.created_at <= to_datetime]
+    
+    return filtered_tickets
