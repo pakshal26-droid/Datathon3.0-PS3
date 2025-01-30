@@ -55,10 +55,7 @@ const Dashboard = () => {
 
   const chartData = useMemo(() => {
     if (!gptRes.length) return [];
-
-    // Create a map to store tickets per day
     const ticketsByDay = gptRes.reduce((acc, ticket) => {
-      // Format the date properly
       const date = new Date(ticket.created_at);
       const formattedDate = date.toLocaleDateString('en-US', {
         month: 'short',
@@ -69,12 +66,11 @@ const Dashboard = () => {
       return acc;
     }, {});
 
-    // Convert to array and sort by date
+    
     const sortedData = Object.entries(ticketsByDay)
       .map(([date, count]) => ({
         date,
         value: count,
-        // Add a timestamp for proper sorting
         timestamp: new Date(date).getTime()
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
@@ -255,7 +251,7 @@ const Dashboard = () => {
                 stroke="#94a3b8"
                 tickMargin={10}
                 tickFormatter={(value) => {
-                  // Format the tick labels to show only month and day
+                  // Format the  labels to show only month and day
                   const date = new Date(value);
                   return date.toLocaleDateString('en-US', { 
                     month: 'short',
@@ -276,7 +272,6 @@ const Dashboard = () => {
                 }}
                 labelStyle={{ color: '#1e293b' }}
                 labelFormatter={(value) => {
-                  // Format the tooltip label
                   return `Date: ${value}`;
                 }}
                 formatter={(value) => [`${value} tickets`, 'Volume']}

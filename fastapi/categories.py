@@ -20,9 +20,8 @@ load_dotenv(override=True)
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
-# Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-# Update model to use Gemini 1.5 Flash
+# Gemini 1.5 Flash
 vision_model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Initialize FastAPI app
@@ -194,7 +193,7 @@ chatbot_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
-# Enhanced request and response schemas
+# Req , res schemas
 class TicketRequest(BaseModel):
     name: str
     description: str
@@ -223,7 +222,7 @@ class Ticket(BaseModel):
     urgency: str
     status: str
     response: str
-    created_at: datetime  # Add this line
+    created_at: datetime 
 
 class AnalyticsResponse(BaseModel):
     total_tickets: int
@@ -278,12 +277,12 @@ async def create_ticket(
 ):
     """Create a new support ticket"""
     try:
-        # Handle image processing if present
+        
         if image:
             # Read and process image with Gemini
             contents = await image.read()
             
-            # Save temporarily and open with PIL
+            # save temporarily and open with PIL
             temp_path = f"temp_{image.filename}"
             with open(temp_path, "wb") as f:
                 f.write(contents)
@@ -340,7 +339,7 @@ async def chat_endpoint(request: ChatRequest):
         chat_chain = chatbot_prompt | llm | output_parser
         response = chat_chain.invoke({"question": request.message}).strip()
 
-        # Store chat history (optional)
+        # Store chat history
         if request.user_id not in chat_history:
             chat_history[request.user_id] = []
         chat_history[request.user_id].append({
@@ -373,26 +372,24 @@ async def get_chat_history(user_id: str):
 async def get_analytics():
     """Get analytics data for the dashboard"""
     try:
-        # Calculate total tickets
+        #  total tickets
         total_tickets = len(tickets_db)
         
-        # Count open tickets
+        #  open tickets
         open_tickets = sum(1 for ticket in tickets_db if ticket.status == "Open")
         
-        # Calculate average resolution time
+        #  average resolution time
         resolution_times = []
         for ticket in tickets_db:
             if ticket.status == "Resolved":
                 created = ticket.created_at
-                # Simulate resolution time for demo purposes
-                # In real app, you'd use actual resolution timestamp
                 resolution_time = created + timedelta(hours=float(ticket.id))
                 time_diff = (resolution_time - created).total_seconds() / 3600  # Convert to hours
                 resolution_times.append(time_diff)
         
         avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
         
-        # Count tickets by category and status
+        #  tickets by category and status
         tickets_by_category = defaultdict(int)
         tickets_by_status = defaultdict(int)
         
@@ -400,7 +397,7 @@ async def get_analytics():
             tickets_by_category[ticket.category] += 1
             tickets_by_status[ticket.status] += 1
         
-        # Get response times data for chart
+        
         response_times = [
             {
                 "date": (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d"),
