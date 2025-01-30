@@ -5,24 +5,49 @@ import axios from 'axios';
 import ChatInterface from './components/ChatInterface';
 import Dashboard from './components/Dashboard';
 import FAQ from './components/FAQ';
+import TicketDetails from './components/TicketDetails';
 
 // Ticket Form Component
 const TicketForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    user_email: ''
+    user_email: '',
+    image: null
   });
+  const [imagePreview, setImagePreview] = useState(null);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, image: file });
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
     try {
-      await axios.post(`http://127.0.0.1:8000/tickets/`, formData);
+      const submitData = new FormData();
+      submitData.append('name', formData.name);
+      submitData.append('user_email', formData.user_email);
+      submitData.append('description', formData.description);
+      if (formData.image) {
+        submitData.append('image', formData.image);
+      }
+
+      await axios.post(`http://127.0.0.1:8000/tickets/`, submitData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       setMessage('Ticket submitted successfully!');
-      setFormData({ name: '', description: '', user_email: '' });
+      setFormData({ name: '', description: '', user_email: '', image: null });
+      setImagePreview(null);
     } catch (error) {
       setMessage('Error submitting ticket');
       console.log(error.message);
@@ -34,7 +59,7 @@ const TicketForm = () => {
   return (
     <>
       <div className="max-w-4xl mx-auto p-6">
-        <h2 className="text-5xl font-bold text-center mb-6">Submit Support Ticket</h2>
+        <h2 className="text-5xl font-bold text-center mb-8">Submit Support Ticket</h2>
         {message && (
           <div className="mb-4 p-2 bg-green-100 text-green-700 rounded">
             {message}
@@ -66,15 +91,52 @@ const TicketForm = () => {
           </div>
           </div>
           
-          <div>
-            {/* <label className="block mb-1">Message</label> */}
+          <div className="flex flex-row gap-4">
             <textarea
               value={formData.description}
-              placeholder='Describe your issue...'
+              placeholder='Describe your issue... or upload an image'
               onChange={(e) => setFormData({...formData, description: e.target.value})}
-              className="w-full p-2 border-2 h-[40vh] rounded h-32"
-              required
+              className="w-full p-2 border-2 h-[40vh] rounded"
+              required={!formData.image}
             />
+            
+            <div className="flex items-center h-[40vh] justify-center w-1/2">
+              <label className="flex flex-col items-center justify-center w-full h-[40vh] border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                  <p className="text-xs text-gray-500">PNG, JPG (max. size 5mb)</p>
+                </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+              </label>
+            </div>
+            
+            {imagePreview && (
+              <div className="relative">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="max-h-[200px] object-contain rounded"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({...formData, image: null});
+                    setImagePreview(null);
+                  }}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
           
           <button
@@ -136,6 +198,7 @@ const App = () => {
           <Route path="/" element={<TicketFormWithChat />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="/ticket/:id" element={<TicketDetails />} />
         </Routes>
       </div>
     </Router>

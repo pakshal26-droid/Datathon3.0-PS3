@@ -1,7 +1,8 @@
 import React, { useState, useEffect , useMemo } from 'react';
 import axios from 'axios';
 import { LineChart, XAxis, YAxis, Tooltip, Line, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { ArrowUp, ArrowDown, Users, Clock, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Users, Clock, CheckCircle, AlertCircle, ChevronDown, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const [tickets, setTickets] = useState([]);
@@ -10,6 +11,9 @@ const Dashboard = () => {
   const [gptRes, setGptRes] = useState([]);
   const [openActionId, setOpenActionId] = useState(null);
   const [openFilterType, setOpenFilterType] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchData();
@@ -96,7 +100,25 @@ const Dashboard = () => {
     }
   };
 
-  const toggleDropdown = (id) => {
+  const handleDeleteClick = (e, ticketId) => {
+    e.stopPropagation();
+    setTicketToDelete(ticketId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await axios.delete(`http://127.0.0.1:8000/tickets/${ticketToDelete}`);
+      setShowDeleteModal(false);
+      setTicketToDelete(null);
+      fetchData(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+    }
+  };
+
+  const toggleDropdown = (e, id) => {
+    e.stopPropagation(); // Stop event from bubbling up
     setOpenActionId(openActionId === id ? null : id);
   };
 
@@ -107,6 +129,10 @@ const Dashboard = () => {
   const handleFilterChange = (type, value) => {
     setFilter({ ...filter, [type]: value });
     setOpenFilterType(null);
+  };
+
+  const handleRowClick = (ticketId) => {
+    navigate(`/ticket/${ticketId}`);
   };
 
   // Calculate percentage changes (mock data for demo)
@@ -123,6 +149,29 @@ const Dashboard = () => {
       </div>
     );
   };
+
+  const DeleteModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+        <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
+        <p className="text-gray-600 mb-6">Are you sure you want to delete this ticket? This action cannot be undone.</p>
+        <div className="flex justify-end gap-4">
+          <button
+            onClick={() => setShowDeleteModal(false)}
+            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmDelete}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -361,68 +410,86 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {gptRes.map(ticket => (
-                <tr key={ticket.id} className="hover:bg-gray-50 ">
-                  <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900">{ticket.id}</td>
-                  <td className="px-6 py-4 text-md text-gray-900">{ticket.description}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900">{ticket.category}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-md leading-5 font-semibold rounded-full ${
-                      ticket.status === 'Open' ? 'bg-yellow-100 text-yellow-800' :
-                      ticket.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {ticket.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900">
-                    {new Date(ticket.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900 relative">
-                    <div className="relative action-dropdown">
-                      <button
-                        onClick={() => toggleDropdown(ticket.id)}
-                        className="px-4 py-2 text-md font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-between w-36"
-                      >
-                        {ticket.status}
-                        <ChevronDown 
-                          size={16} 
-                          className={`transform transition-transform duration-200 ${
-                            openActionId === ticket.id ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
+  {gptRes.map(ticket => (
+    <tr 
+      key={ticket.id} 
+      className="hover:bg-gray-50 cursor-pointer"
+      onClick={() => handleRowClick(ticket.id)}
+    >
+      <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900">{ticket.id}</td>
+      <td className="px-6 py-4 text-md text-gray-900">{ticket.description}</td>
+      <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900">{ticket.category}</td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`px-2 inline-flex text-md leading-5 font-semibold rounded-full ${
+          ticket.status === 'Open' ? 'bg-yellow-100 text-yellow-800' :
+          ticket.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+          'bg-green-100 text-green-800'
+        }`}>
+          {ticket.status}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900">
+        {new Date(ticket.created_at).toLocaleDateString()}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-md text-gray-900 relative">
+        <div className="flex gap-2">
+          <div className="relative action-dropdown">
+            <button
+              onClick={(e) => toggleDropdown(e, ticket.id)}
+              className="px-4 py-2 text-md font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-between w-36"
+            >
+              {ticket.status}
+              <ChevronDown 
+                size={16} 
+                className={`transform transition-transform duration-200 ${
+                  openActionId === ticket.id ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
 
-                      {openActionId === ticket.id && (
-                        <div className="absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1" role="menu">
-                            {['Open', 'In Progress', 'Resolved'].map((status) => (
-                              <button
-                                key={status}
-                                onClick={() => {
-                                  updateGptTicketStatus(ticket.id, status);
-                                  toggleDropdown(ticket.id);
-                                }}
-                                className={`block px-4 py-2 text-md text-gray-700 hover:bg-gray-100 w-full text-left ${
-                                  ticket.status === status ? 'bg-gray-50' : ''
-                                }`}
-                                role="menuitem"
-                              >
-                                {status}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-wrap text-md text-gray-900">{ticket.response?.slice(0,200)+"..."}</td>
-                </tr>
-              ))}
-            </tbody>
+            {openActionId === ticket.id && (
+              <div className="absolute right-0 mt-2 w-36 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                <div className="py-1" role="menu">
+                  {['Open', 'In Progress', 'Resolved'].map((status) => (
+                    <button
+                      key={status}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Stop event from bubbling up
+                        updateGptTicketStatus(ticket.id, status);
+                        toggleDropdown(e, ticket.id);
+                      }}
+                      className={`block px-4 py-2 text-md text-gray-700 hover:bg-gray-100 w-full text-left ${
+                        ticket.status === status ? 'bg-gray-50' : ''
+                      }`}
+                      role="menuitem"
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={(e) => handleDeleteClick(e, ticket.id)}
+            className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+          >
+            <Trash2 size={20} />
+          </button>
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-normal text-md text-gray-900">
+        {ticket.response?.slice(0, 200) + "..."}
+      </td>
+    </tr>
+  ))}
+</tbody>
+
           </table>
         </div>
       </div>
+      {showDeleteModal && <DeleteModal />}
     </div>
   );
 };

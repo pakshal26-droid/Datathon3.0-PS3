@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List,Optional, Union , Dict
 from datetime import datetime, timedelta  # Fix import statement
 from collections import defaultdict
+import base64
+import google.generativeai as genai
+import PIL.Image
 
 
 # Load environment variables
@@ -16,6 +19,11 @@ load_dotenv(override=True)
 
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+
+# Configure Gemini API
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Update model to use Gemini 1.5 Flash
+vision_model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -58,6 +66,7 @@ ticket_type_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
+
 urgency_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", '''Evaluate the urgency of this support ticket **based on**:  
@@ -85,6 +94,7 @@ urgency_prompt = ChatPromptTemplate.from_messages(
         ("user", "Ticket: {ticket}")
     ]
 )
+
 
 response_prompt = ChatPromptTemplate.from_messages(
     [
@@ -260,29 +270,59 @@ async def get_ticket(ticket_id: int):
     return ticket
 
 @app.post("/tickets/", response_model=Ticket)
-async def create_ticket(request: TicketRequest):
+async def create_ticket(
+    name: str = Form(...),
+    description: str = Form(...),
+    user_email: str = Form(...),
+    image: UploadFile = File(None)
+):
     """Create a new support ticket"""
     try:
-        # Classify ticket type and urgency
+        # Handle image processing if present
+        if image:
+            # Read and process image with Gemini
+            contents = await image.read()
+            
+            # Save temporarily and open with PIL
+            temp_path = f"temp_{image.filename}"
+            with open(temp_path, "wb") as f:
+                f.write(contents)
+            
+            img = PIL.Image.open(temp_path)
+            
+            # text extraction from image description using updated model
+            response = vision_model.generate_content([
+                "Please extract the text from this Image. Don't give the solution / suggestions or additional statements , just extract the text from the image",
+                img
+            ])
+            
+            os.remove(temp_path)
+            full_description = (
+                f"{description}\n\n"
+                f"Image Analysis: {response.text}"
+            )
+        else:
+            full_description = description
+
+       
         ticket_type_chain = ticket_type_prompt | llm | output_parser
-        category = ticket_type_chain.invoke({"ticket": request.description}).strip()
+        category = ticket_type_chain.invoke({"ticket": full_description}).strip()
 
         urgency_chain = urgency_prompt | llm | output_parser
-        urgency = urgency_chain.invoke({"ticket": request.description}).strip()
+        urgency = urgency_chain.invoke({"ticket": full_description}).strip()
 
-        # Generate response
         response_chain = response_prompt | llm | output_parser
-        ticket_response = response_chain.invoke({"ticket": request.description}).strip()
+        ticket_response = response_chain.invoke({"ticket": full_description}).strip()
 
         # Create ticket object
         ticket = Ticket(
             id=len(tickets_db) + 1,
-            name=request.name,
-            description=request.description,
-            user_email=request.user_email,
+            name=name,
+            description=full_description,
+            user_email=user_email,
             category=category,
             urgency=urgency,
-            created_at=datetime.now(),  # Use datetime.now() correctly
+            created_at=datetime.now(),  
             status="Open",
             response=ticket_response
         )
@@ -380,31 +420,19 @@ async def get_analytics():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# @app.get("/tickets/filtered/")
-# async def get_filtered_tickets(
-#     status: Optional[str] = None,
-#     category: Optional[str] = None,
-#     from_date: Optional[str] = None,
-#     to_date: Optional[str] = None
-# ):
-#     """Get filtered tickets based on criteria"""
-#     filtered_tickets = tickets_db.copy()
-    
-#     if status:
-#         filtered_tickets = [t for t in filtered_tickets if t.status == status]
-    
-#     if category:
-#         filtered_tickets = [t for t in filtered_tickets if t.category == category]
-    
-#     if from_date:
-#         from_datetime = datetime.fromisoformat(from_date)
-#         filtered_tickets = [t for t in filtered_tickets if t.created_at >= from_datetime]
-    
-#     if to_date:
-#         to_datetime = datetime.fromisoformat(to_date)
-#         filtered_tickets = [t for t in filtered_tickets if t.created_at <= to_datetime]
-    
-#     return filtered_tickets
+@app.delete("/tickets/{ticket_id}")
+async def delete_ticket(ticket_id: int):
+    """Delete a specific ticket"""
+    try:
+        ticket_index = next((index for (index, ticket) in enumerate(tickets_db) if ticket.id == ticket_id), None)
+        if ticket_index is None:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        tickets_db.pop(ticket_index)
+        return {"message": "Ticket deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/tickets/filtered/", response_model=List[Ticket])
 async def get_filtered_tickets(
     status: Optional[str] = None,
