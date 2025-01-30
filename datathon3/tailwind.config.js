@@ -3,8 +3,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        'roboto': ['Roboto', 'sans-serif'],
-        'Anek':['Anek Latin'],
+        sans: ['Anek Latin', 'sans-serif'],
+        anek: ['Anek Latin', 'sans-serif'],
       },
     },
   },
