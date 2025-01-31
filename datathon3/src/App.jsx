@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import { supabase } from './lib/supabase';
 import ChatInterface from './components/ChatInterface';
 import Dashboard from './components/Dashboard';
 import FAQ from './components/FAQ';
 import TicketDetails from './components/TicketDetails';
+import Login from './components/Auth/Login';
+import Signup from './components/Auth/Signup';
+import Homepage from './components/Homepage';
 
 // Ticket Form Component
 const TicketForm = () => {
@@ -90,7 +94,7 @@ const TicketForm = () => {
           </div>
           </div>
           
-          <div className="flex flex-row gap-4">
+          <div className="flex flex-col gap-4">
             <textarea
               value={formData.description}
               placeholder='Describe your issue... or upload an image'
@@ -99,7 +103,7 @@ const TicketForm = () => {
               required={!formData.image}
             />
             
-            <div className="flex items-center h-[40vh] justify-center w-1/2">
+            <div className="flex items-center h-[40vh] justify-center ">
               <label className="flex flex-col items-center justify-center w-full h-[40vh] border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
@@ -166,38 +170,121 @@ const TicketFormWithChat = () => {
   );
 };
 
+const ProtectedRoute = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+};
+
 // Main App Component
 const App = () => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100 font-Anek tracking-tight ">
-        <nav className="bg-white shadow mb-8">
-          <div className=" mx-auto px-4">
-            <div className="flex justify-between h-16">
-              <div className="flex items-center justify-between w-full">
-                <h1 className='text-2xl font-semibold'>SeepDeek</h1>
-                <div className='flex flex-row gap-x-5'>
-                <Link to="/" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
-                  Submit Ticket
-                </Link>
-                <Link to="/dashboard" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
-                  Dashboard
-                </Link>
-                <Link to="/faq" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
-                  FAQ
-                </Link>
+      <div className="min-h-screen bg-gray-100 font-Anek tracking-tight">
+        {user && (
+          <nav className="bg-white shadow mb-8">
+            <div className="mx-auto px-4">
+              <div className="flex justify-between h-16">
+                <div className="flex items-center justify-between w-full">
+                  <h1 className='text-2xl font-semibold'>SeepDeek</h1>
+                  <div className='flex flex-row gap-x-5'>
+                    <Link to="/" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
+                      Submit Ticket
+                    </Link>
+                    <Link to="/dashboard" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
+                      Dashboard
+                    </Link>
+                    <Link to="/faq" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
+                      FAQ
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center px-4 text-gray-700 hover:text-gray-900"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
-                
               </div>
             </div>
-          </div>
-        </nav>
+          </nav>
+        )}
 
         <Routes>
-          <Route path="/" element={<TicketFormWithChat />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/ticket/:id" element={<TicketDetails />} />
+          <Route path="/" element={<Homepage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/submit-ticket"
+            element={
+              <ProtectedRoute>
+                <TicketFormWithChat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/faq"
+            element={
+              <ProtectedRoute>
+                <FAQ />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ticket/:id"
+            element={
+              <ProtectedRoute>
+                <TicketDetails />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
