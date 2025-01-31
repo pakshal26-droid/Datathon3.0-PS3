@@ -10,17 +10,17 @@ const Homepage = () => {
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-2xl font-bold text-gray-900">SeepDeek</h1>
+            <h1 className="text-2xl font-bold text-gray-900">SeekDesk</h1>
             <div className="flex space-x-4">
               <button
                 onClick={() => navigate('/login')}
-                className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                className="text-gray-700 cursor-pointer hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Sign In
               </button>
               <button
                 onClick={() => navigate('/signup')}
-                className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md text-sm font-medium"
+                className="bg-blue-700 cursor-pointer border-2 border-black/90  text-white hover:bg-blue-700 px-4 py-2 rounded-md text-sm font-medium"
               >
                 Sign Up
               </button>

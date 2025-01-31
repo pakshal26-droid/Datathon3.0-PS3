@@ -224,7 +224,7 @@ const App = () => {
             <div className="mx-auto px-4">
               <div className="flex justify-between h-16">
                 <div className="flex items-center justify-between w-full">
-                  <h1 className='text-2xl font-semibold'>SeepDeek</h1>
+                  <h1 className='text-2xl font-semibold'>SeekDesk</h1>
                   <div className='flex flex-row gap-x-5'>
                     <Link to="/" className="flex items-center px-4 text-gray-700 hover:text-gray-900">
                       Submit Ticket
@@ -237,7 +237,7 @@ const App = () => {
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="flex items-center px-4 text-gray-700 hover:text-gray-900"
+                      className="flex cursor-pointer items-center px-4 text-gray-700 hover:text-gray-900"
                     >
                       Sign Out
                     </button>
