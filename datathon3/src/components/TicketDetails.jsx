@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, Trash2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const TicketDetails = () => {
   const { id } = useParams();
@@ -128,8 +129,8 @@ const TicketDetails = () => {
 
         <div>
           <h3 className="text-sm font-medium text-gray-500 mb-2">AI Response</h3>
-          <div className="p-4 bg-gray-50 rounded-lg text-md text-gray-900">
-            {ticket.response}
+          <div className="p-4 bg-gray-50 rounded-lg prose prose-sm max-w-none">
+            <ReactMarkdown>{ticket.response}</ReactMarkdown>
           </div>
         </div>
       </div>

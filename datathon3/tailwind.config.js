@@ -1,12 +1,13 @@
-module.exports = {
-  // ...existing code...
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
-    extend: {
-      fontFamily: {
-        sans: ['Anek Latin', 'sans-serif'],
-        anek: ['Anek Latin', 'sans-serif'],
-      },
-    },
+    extend: {},
   },
-  // ...existing code...
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }

@@ -190,7 +190,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/homepage" />;
   }
 
   return children;
@@ -249,7 +249,7 @@ const App = () => {
         )}
 
         <Routes>
-          <Route path="/" element={<Homepage />} />
+          <Route path="/homepage" element={<Homepage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           
@@ -262,7 +262,7 @@ const App = () => {
             }
           />
           <Route
-            path="/submit-ticket"
+            path="/"
             element={
               <ProtectedRoute>
                 <TicketFormWithChat />
